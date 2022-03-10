@@ -1,38 +1,73 @@
-import time
+from datetime import datetime, timedelta
+import os
 
 from flask import Flask, jsonify, request
+from flask_migrate import Migrate
+from sqlalchemy import desc
+
+from models import db, SensorReadings
+
 
 app = Flask(__name__)
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URI")
+db.init_app(app)
+migrate = Migrate(app, db)
 
-sitting_start_time = time.time()
+
+@app.route("/", methods=["GET"])
+def health():
+    return jsonify({"status": "UP"})
 
 
 @app.route("/pressure", methods=["POST", "GET"])
 def sensor():
-    global sitting_start_time
     if request.method == "POST":
-        pressure_readings = {}
-        is_zeroed = True
+        pressure_reading = {}
+        is_zero = True
         for sensor_id in request.args:
-            pressure_reading = float(request.args.get(sensor_id))
-            pressure_readings[sensor_id] = pressure_reading
-            is_zeroed = is_zeroed and (pressure_reading == 0)
-        if is_zeroed:  # user is not sitting
-            sitting_start_time = 0
-        # TODO: write to database
-        return pressure_readings
+            pressure_value = float(request.args.get(sensor_id))
+            pressure_reading[sensor_id] = pressure_value
+            is_zero = is_zero and (pressure_value == 0)
+        if is_zero or (
+            SensorReadings.query.order_by(desc("timestamp")).first()
+            and SensorReadings.query.order_by(desc("timestamp")).first().is_zero
+        ):  # clear data where user was not sitting
+            SensorReadings.query.delete()
+        try:
+            sensor_reading = SensorReadings(
+                timestamp=datetime.now(),
+                pressure_reading=pressure_reading,
+                is_zero=is_zero,
+            )
+            db.session.add(sensor_reading)
+            db.session.commit()
+            return jsonify(sensor_reading.serialize())
+        except Exception as e:
+            print(str(e))
+            return jsonify(str(e))
     else:
-        # TODO: return most recent values in database
-        pass
+        pressure_reading = SensorReadings.query.order_by(desc("timestamp")).first()
+        return jsonify(pressure_reading.serialize())
 
 
 @app.route("/time_since", methods=["GET"])
 def time_since():
-    global sitting_start_time
+    sitting_start_time = (
+        SensorReadings.query.order_by("timestamp").first().timestamp
+        if SensorReadings.query.order_by("timestamp").first()
+        and not SensorReadings.query.order_by("timestamp").first().is_zero
+        else 0
+    )
     return jsonify(
         {
-            "time_since": time.time() - sitting_start_time
-            if sitting_start_time > 0
+            "time_since": timedelta.total_seconds(datetime.now() - sitting_start_time)
+            if sitting_start_time != 0
             else 0
         }
     )
+
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
