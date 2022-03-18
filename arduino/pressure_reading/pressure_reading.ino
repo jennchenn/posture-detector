@@ -1,83 +1,128 @@
-//#include <ESP8266WiFi.h>
-//#include <ESP8266HTTPClient.h>
-//#include <WiFiClient.h>
+const String ssid = "****";
+const String password = "****";
 
-const char *ssid = "REPLACE_WITH_YOUR_SSID";
-const char *password = "REPLACE_WITH_YOUR_PASSWORD";
 const float INPUT_VOLTAGE = 5.0;
-
-// Your Domain name with URL path or IP address with path
-const char *serverName = "https://seat-posture-detector.herokuapp.com/pressure"; 
-
-unsigned long lastTime = 0;
-// Set timer to 5 seconds (5000)
-unsigned long timerDelay = 1000;
-
 const int NUM_PINS = 7;
-const uint8_t ANALOG_PINS[] = {A0, A1, A2, A3, A4, A5, A6, A7};
+const byte ANALOG_PINS[] = {A0, A1, A2, A3, A4, A5, A6, A7};
+String data;
+
+const String server = "seat-posture-detector.herokuapp.com";
+const String uri = "/pressure";
 
 void setup()
 {
-    Serial.begin(115200);
+  Serial.begin(9600);
+  Serial3.begin(9600);
+  //  reset();
+  connectWifi();
+}
 
-    WiFi.begin(ssid, password);
-    Serial.println("Connecting");
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        delay(500);
-        Serial.print(".");
-    }
-    Serial.println("");
-    Serial.print("Connected to WiFi network with IP Address: ");
-    Serial.println(WiFi.localIP());
+// reset the esp8266 module
+void reset()
+{
+  Serial3.println("AT+RST");
+  delay(1000);
+  if (Serial3.find("OK"))
+    Serial.println("Module Reset");
+}
 
-    Serial.println("Timer set to 5 seconds (timerDelay variable), it will take 5 seconds before publishing the first reading.");
+// connect to your wifi network
+void connectWifi()
+{
+  Serial.println("Initializing...");
+  String cmd = "AT+CWJAP=\"";
+  cmd += ssid;
+  cmd += "\",\"";
+  cmd += password;
+  cmd += "\"";
+  Serial3.println(cmd);
+  delay(1000);
+  if (Serial3.find("OK") || Serial3.find("WIFI CONNECTED"))
+  {
+    Serial.println("WiFi connected");
+  }
+  else
+  {
+    Serial.println("WiFi Not connected");
+  }
 }
 
 void loop()
 {
-    // Send an HTTP POST request every 5 seconds
-    if ((millis() - lastTime) > timerDelay)
+  int value;
+  float volt;
+  data = "";
+
+  for (int i = 0; i < NUM_PINS; i++)
+  {
+    value = analogRead(ANALOG_PINS[i]);
+    volt = value * INPUT_VOLTAGE / 1023.0;
+    data = data + i + "=" + String(volt, 6);
+    if (i != NUM_PINS - 1) // check if there are more values to append
     {
-        // Check WiFi connection status
-        if (WiFi.status() == WL_CONNECTED)
-        {
-            // set up WiFi connection
-            WiFiClient client;
-            HTTPClient http;
-
-            // read sensor values
-            String sensorValues;
-            int value;
-            float volt;
-
-            for (int i = 0; i < NUM_PINS; i++)
-            {
-                value = analogRead(ANALOG_PINS[i]);
-                volt = value * INPUT_VOLTAGE / 1023.0;
-                sensorValues = sensorValues + i + "=" + String(volt, 6);
-                if (i != NUM_PINS - 1) // check if there are more values to append
-                {
-                    sensorValues += "&";
-                }
-            }
-
-            Serial.println(sensorValues);
-
-            // POST data to server
-            http.begin(client, serverName);
-            http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-            int httpResponseCode = http.POST(sensorValues);
-            Serial.print("HTTP Response code: ");
-            Serial.println(httpResponseCode);
-
-            // Free resources
-            http.end();
-        }
-        else
-        {
-            Serial.println("WiFi Disconnected");
-        }
-        lastTime = millis();
+      data += "&";
     }
+  }
+  httppost();
+
+  //  if ( Serial3.available() ) {
+  //    Serial.write( Serial3.read() );
+  //  }
+  //  // listen for user input and send it to the ESP8266
+  //  if ( Serial.available() ) {
+  //    Serial3.write( Serial.read() );
+  //  }
+
+  delay(1000);
+}
+
+void httppost()
+{
+  Serial3.println("AT+CIPSTART=\"TCP\",\"" + server + "\",80"); // start a TCP connection.
+  if (Serial3.find("OK"))
+  {
+    Serial.println("TCP connection ready");
+  }
+  delay(1000);
+
+  String postRequest =
+      "POST " + uri + "?" + data + " HTTP/1.1\r\n" +
+      "Host: " + server + "\r\n" +
+      "Accept: *" + "/" + "*\r\n" +
+      "Content-Type: application/x-www-form-urlencoded\r\n" +
+      "\r\n";
+  //      "Content-Length: " + data.length() + "\r\n" +
+  //      "\r\n" + data + "\r\n\r\n";
+  Serial.println(postRequest);
+  //  String postRequest =
+  //    "GET " + uri + " HTTP/1.1\r\n" +
+  //    "Host: " + server + "\r\n\r\n";
+
+  String sendCmd = "AT+CIPSEND="; // determine the number of characters to be sent.
+  Serial3.print(sendCmd);
+  Serial3.println(postRequest.length());
+  delay(500);
+
+  if (Serial3.find(">"))
+  {
+    Serial.println("Sending..");
+    Serial3.print(postRequest);
+    if (Serial3.find("SEND OK"))
+    {
+      Serial.println("Packet sent");
+      Serial.println(Serial3.readString());
+      delay(1000);
+      Serial.println(Serial3.readString());
+      Serial.println(Serial3.readString());
+      Serial.println(Serial3.readString());
+      Serial.println(Serial3.readString());
+      while (Serial3.available())
+      {
+        String tmpResp = Serial3.readString();
+        Serial.println(tmpResp);
+      }
+      // close the connection
+      Serial3.println("AT+CIPCLOSE");
+    }
+  }
 }
