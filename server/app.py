@@ -24,23 +24,23 @@ def health():
 def sensor():
     if request.method == "POST":
         pressure_reading = {}
-        is_zero_pressure = True
+        is_zero = True
         for sensor_id in request.args:
             pressure_value = float(request.args.get(sensor_id))
             pressure_reading[sensor_id] = pressure_value
-            is_zero_pressure = is_zero_pressure and (pressure_value > 4.8)
-        if is_zero_pressure or (
+            is_zero = is_zero and (pressure_value > 4.8)
+        if is_zero or (
             SensorReadings.query.order_by(desc("timestamp")).first()
             and SensorReadings.query.order_by(desc("timestamp"))
             .first()
-            .is_zero_pressure
+            .is_zero
         ):  # clear data where user was not sitting
             SensorReadings.query.delete()
         try:
             sensor_reading = SensorReadings(
                 timestamp=datetime.now(),
                 pressure_reading=pressure_reading,
-                is_zero_pressure=is_zero_pressure,
+                is_zero=is_zero,
             )
             db.session.add(sensor_reading)
             db.session.commit()
@@ -58,7 +58,7 @@ def time_since():
     sitting_start_time = (
         SensorReadings.query.order_by("timestamp").first().timestamp
         if SensorReadings.query.order_by("timestamp").first()
-        and not SensorReadings.query.order_by("timestamp").first().is_zero_pressure
+        and not SensorReadings.query.order_by("timestamp").first().is_zero
         else 0
     )
     return jsonify(
