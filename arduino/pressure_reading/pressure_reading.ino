@@ -14,7 +14,11 @@ void setup()
   Serial.begin(9600);
   Serial3.begin(9600);
   //  reset();
-  connectWifi();
+  boolean isConnected = connectWifi();
+  while (!isConnected) {
+    isConnected = connectWifi();
+    delay(1000);
+  }
 }
 
 // reset the esp8266 module
@@ -27,7 +31,7 @@ void reset()
 }
 
 // connect to your wifi network
-void connectWifi()
+boolean connectWifi()
 {
   Serial.println("Initializing...");
   String cmd = "AT+CWJAP=\"";
@@ -40,10 +44,12 @@ void connectWifi()
   if (Serial3.find("OK") || Serial3.find("WIFI CONNECTED"))
   {
     Serial.println("WiFi connected");
+    return true;
   }
   else
   {
     Serial.println("WiFi Not connected");
+    return false;
   }
 }
 
@@ -107,6 +113,9 @@ void httppost()
   {
     Serial.println("Sending..");
     Serial3.print(postRequest);
+    while (!Serial3.find("SEND OK")) {
+      delay(1000);
+    }
     if (Serial3.find("SEND OK"))
     {
       Serial.println("Packet sent");
