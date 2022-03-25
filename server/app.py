@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import os
+import time
 
 from flask import Flask, jsonify, request
 from flask_migrate import Migrate
@@ -23,6 +24,7 @@ def health():
 @app.route("/pressure", methods=["POST", "GET"])
 def sensor():
     if request.method == "POST":
+        start = time.process_time()
         pressure_reading = {}
         is_zero = True
         for sensor_id in request.args:
@@ -31,9 +33,7 @@ def sensor():
             is_zero = is_zero and (pressure_value > 4.8)
         if is_zero or (
             SensorReadings.query.order_by(desc("timestamp")).first()
-            and SensorReadings.query.order_by(desc("timestamp"))
-            .first()
-            .is_zero
+            and SensorReadings.query.order_by(desc("timestamp")).first().is_zero
         ):  # clear data where user was not sitting
             SensorReadings.query.delete()
         try:
@@ -44,6 +44,7 @@ def sensor():
             )
             db.session.add(sensor_reading)
             db.session.commit()
+            print("EXECUTION TIME", time.process_time() - start)
             return jsonify(sensor_reading.serialize())
         except Exception as e:
             print(str(e))
