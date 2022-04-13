@@ -1,7 +1,7 @@
-const String ssid = "****";
-const String password = "****";
+const String ssid = "*****";
+const String password = "*****";
 
-const float INPUT_VOLTAGE = 5.0;
+const float INPUT_VOLTAGE =5.0;
 const int NUM_PINS = 7;
 const byte ANALOG_PINS[] = {A0, A1, A2, A3, A4, A5, A6, A7};
 String data;
@@ -13,21 +13,11 @@ void setup()
 {
   Serial.begin(9600);
   Serial3.begin(9600);
-  //  reset();
   boolean isConnected = connectWifi();
   while (!isConnected) {
     isConnected = connectWifi();
     delay(1000);
   }
-}
-
-// reset the esp8266 module
-void reset()
-{
-  Serial3.println("AT+RST");
-  delay(1000);
-  if (Serial3.find("OK"))
-    Serial.println("Module Reset");
 }
 
 // connect to your wifi network
@@ -70,16 +60,6 @@ void loop()
     }
   }
   httppost();
-
-  //  if ( Serial3.available() ) {
-  //    Serial.write( Serial3.read() );
-  //  }
-  //  // listen for user input and send it to the ESP8266
-  //  if ( Serial.available() ) {
-  //    Serial3.write( Serial.read() );
-  //  }
-
-  delay(1000);
 }
 
 void httppost()
@@ -92,17 +72,12 @@ void httppost()
   delay(1000);
 
   String postRequest =
-      "POST " + uri + "?" + data + " HTTP/1.1\r\n" +
-      "Host: " + server + "\r\n" +
-      "Accept: *" + "/" + "*\r\n" +
-      "Content-Type: application/x-www-form-urlencoded\r\n" +
-      "\r\n";
-  //      "Content-Length: " + data.length() + "\r\n" +
-  //      "\r\n" + data + "\r\n\r\n";
+    "POST " + uri + "?" + data + " HTTP/1.1\r\n" +
+    "Host: " + server + "\r\n" +
+    "Accept: *" + "/" + "*\r\n" +
+    "Content-Type: application/x-www-form-urlencoded\r\n" +
+    "\r\n";
   Serial.println(postRequest);
-  //  String postRequest =
-  //    "GET " + uri + " HTTP/1.1\r\n" +
-  //    "Host: " + server + "\r\n\r\n";
 
   String sendCmd = "AT+CIPSEND="; // determine the number of characters to be sent.
   Serial3.print(sendCmd);
@@ -113,25 +88,6 @@ void httppost()
   {
     Serial.println("Sending..");
     Serial3.print(postRequest);
-    while (!Serial3.find("SEND OK")) {
-      delay(1000);
-    }
-    if (Serial3.find("SEND OK"))
-    {
-      Serial.println("Packet sent");
-      Serial.println(Serial3.readString());
-      delay(1000);
-      Serial.println(Serial3.readString());
-      Serial.println(Serial3.readString());
-      Serial.println(Serial3.readString());
-      Serial.println(Serial3.readString());
-      while (Serial3.available())
-      {
-        String tmpResp = Serial3.readString();
-        Serial.println(tmpResp);
-      }
-      // close the connection
-      Serial3.println("AT+CIPCLOSE");
-    }
+    Serial3.println("AT+CIPCLOSE");
   }
 }

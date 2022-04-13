@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 import os
-import time
 
 from flask import Flask, jsonify, request
 from flask_migrate import Migrate
@@ -24,7 +23,6 @@ def health():
 @app.route("/pressure", methods=["POST", "GET"])
 def sensor():
     if request.method == "POST":
-        start = time.process_time()
         pressure_reading = {}
         is_zero = True
         for sensor_id in request.args:
@@ -44,7 +42,6 @@ def sensor():
             )
             db.session.add(sensor_reading)
             db.session.commit()
-            print("EXECUTION TIME", time.process_time() - start)
             return jsonify(sensor_reading.serialize())
         except Exception as e:
             print(str(e))
